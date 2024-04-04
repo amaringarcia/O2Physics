@@ -1955,7 +1955,7 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
     cut->AddCut(GetAnalysisCut("PrimaryTrack_looseDCA"));
     return cut;
   }
-  
+
   if (!nameStr.compare("testCut_chic")) {
     cut->AddCut(GetAnalysisCut("jpsiStandardKine5"));
     cut->AddCut(GetAnalysisCut("electronStandardQualityForO2MCdebug"));
@@ -2671,8 +2671,8 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
   }
 
   if (!nameStr.compare("eventStandardtest")) {
-        cut->AddCut(VarManager::kVtxZ, -30.0, 30.0);
-        return cut;
+    cut->AddCut(VarManager::kVtxZ, -30.0, 30.0);
+    return cut;
   }
 
   if (!nameStr.compare("eventStandardSel8")) {

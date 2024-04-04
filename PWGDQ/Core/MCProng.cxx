@@ -411,9 +411,9 @@ bool MCProng::ComparePDG(int pdg, int prongPDG, bool checkBothCharges, bool excl
         ;
       break;
     case 904:
-      decision = absPDG == 20443 || //chic1
-                 absPDG == 445   || //chic2
-                 absPDG == 10441    //chic0
+      decision = absPDG == 20443 || // chic1
+                 absPDG == 445 ||   // chic2
+                 absPDG == 10441    // chic0
         ;
       break;
     default: // all explicit PDG code cases

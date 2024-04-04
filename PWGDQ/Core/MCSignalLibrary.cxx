@@ -246,7 +246,7 @@ MCSignal* o2::aod::dqmcsignals::GetMCSignal(const char* name)
   if (!nameStr.compare("Pi0DecayTogg")) {
     MCProng prong(2, {111, 22}, {true, true}, {false, false}, {0, 0}, {0, 0}, {false, false});
     prong.SetSignalInTime(true); // set direction to check for daughters (true, in time) or for mothers (false, back in time)
-    signal = new MCSignal(name, "Pi0 decays into an gamma, gamma", {prong, prong}, {1,1});
+    signal = new MCSignal(name, "Pi0 decays into an gamma, gamma", {prong, prong}, {1, 1});
     return signal;
   }
   if (!nameStr.compare("PromptPi0DecayToe")) {
@@ -923,7 +923,7 @@ MCSignal* o2::aod::dqmcsignals::GetMCSignal(const char* name)
   }
   if (!nameStr.compare("PhotonFromPi0")) {
     MCProng prong(2, {22, 111}, {true, true}, {false, false}, {0, 0}, {0, 0}, {false, false});
-    //prong.SetSourceBit(0, MCProng::kPhysicalPrimary);
+    // prong.SetSourceBit(0, MCProng::kPhysicalPrimary);
     signal = new MCSignal(name, "Photon from Pi0 decays", {prong}, {1});
     return signal;
   }
