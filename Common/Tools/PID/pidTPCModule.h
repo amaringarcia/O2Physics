@@ -132,7 +132,7 @@ struct pidTPCConfigurables : o2::framework::ConfigurableGroup {
   o2::framework::Configurable<int> useNetworkAl{"useNetworkAl", 1, {"Switch for applying neural network on the alpha mass hypothesis (if network enabled) (set to 0 to disable)"}};
   o2::framework::Configurable<float> networkBetaGammaCutoff{"networkBetaGammaCutoff", 0.45, {"Lower value of beta-gamma to override the NN application"}};
   o2::framework::Configurable<std::string> cfgPathGrpLhcIf{"ccdb-path-grplhcif", "GLO/Config/GRPLHCIF", "Path on the CCDB for the GRPLHCIF object"};
- };
+};
 
 // helper getter - FIXME should be separate
 int getPIDIndex(const int pdgCode) // Get O2 PID index corresponding to MC PDG code
@@ -330,7 +330,7 @@ class pidTPCModule
         o2::parameters::GRPLHCIFData* grpo = ccdb->template getForTimeStamp<o2::parameters::GRPLHCIFData>(pidTPCopts.cfgPathGrpLhcIf.value, time);
         LOG(info) << " collision type::" << CollisionSystemType::getCollisionTypeFromGrp(grpo);
         collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
-        if ( collsys == CollisionSystemType::kCollSyspp ) {
+        if (collsys == CollisionSystemType::kCollSyspp) {
           irSource = "T0VTX";
         } else {
           irSource = "ZNC hadronic";
@@ -412,7 +412,7 @@ class pidTPCModule
         o2::parameters::GRPLHCIFData* grpo = ccdb->template getForTimeStamp<o2::parameters::GRPLHCIFData>(pidTPCopts.cfgPathGrpLhcIf.value, bc.timestamp());
         LOG(info) << "Collision type::" << CollisionSystemType::getCollisionTypeFromGrp(grpo);
         int collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
-        if (collsys == CollisionSystemType::kCollSyspp ) {
+        if (collsys == CollisionSystemType::kCollSyspp) {
           irSource = "T0VTX";
         } else {
           irSource = "ZNC hadronic";
@@ -481,9 +481,9 @@ class pidTPCModule
               hadronicRate = mRateFetcher.fetch(ccdb.service, trk_bc.timestamp(), trk_bc.runNumber(), irSource) * 1.e-3;
             }
             timeStamp_bcOld = trk_bc.timestamp();
-            if( collsys == CollisionSystemType::kCollSyspp ) {
+            if (collsys == CollisionSystemType::kCollSyspp) {
               track_properties[counter_track_props + 7] = hadronicRate / 1500.;
-            }else{
+            } else {
               track_properties[counter_track_props + 7] = hadronicRate / 50.;
             }
           } else {
@@ -765,7 +765,7 @@ class pidTPCModule
         o2::parameters::GRPLHCIFData* grpo = ccdb->template getForTimeStamp<o2::parameters::GRPLHCIFData>(pidTPCopts.cfgPathGrpLhcIf.value,bc.timestamp());
         LOG(info) << "Collisions type::" << CollisionSystemType::getCollisionTypeFromGrp(grpo);
         int collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
-        if (collsys == CollisionSystemType::kCollSyspp ) {
+        if (collsys == CollisionSystemType::kCollSyspp) {
           irSource = "T0VTX";
         } else {
           irSource = "ZNC hadronic";
