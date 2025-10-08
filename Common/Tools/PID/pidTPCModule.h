@@ -22,13 +22,12 @@
 #define COMMON_TOOLS_PID_PIDTPCMODULE_H_
 
 #include "Common/CCDB/ctpRateFetcher.h"
+#include "Common/Core/CollisionTypeHelper.h"
 #include "Common/Core/PID/TPCPIDResponse.h"
 #include "Common/Core/TableHelper.h"
-#include "Common/Core/CollisionTypeHelper.h"
 #include "Common/DataModel/PIDResponseTPC.h"
 #include "Common/TableProducer/PID/pidTPCBase.h"
 #include "Tools/ML/model.h"
-
 #include <DataFormatsParameters/GRPLHCIFData.h>
 #include <Framework/AnalysisDataModel.h>
 #include <Framework/AnalysisHelpers.h>
@@ -762,7 +761,7 @@ class pidTPCModule
           }
         }
         LOG(info) << "Successfully retrieved TPC PID object from CCDB for timestamp " << bc.timestamp() << ", period " << headers["LPMProductionTag"] << ", recoPass " << headers["RecoPassName"];
-        o2::parameters::GRPLHCIFData* grpo = ccdb->template getForTimeStamp<o2::parameters::GRPLHCIFData>(pidTPCopts.cfgPathGrpLhcIf.value,bc.timestamp());
+        o2::parameters::GRPLHCIFData* grpo = ccdb->template getForTimeStamp<o2::parameters::GRPLHCIFData>(pidTPCopts.cfgPathGrpLhcIf.value, bc.timestamp());
         LOG(info) << "Collisions type::" << CollisionSystemType::getCollisionTypeFromGrp(grpo);
         int collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
         if (collsys == CollisionSystemType::kCollSyspp) {
