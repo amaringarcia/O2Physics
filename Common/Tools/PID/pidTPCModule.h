@@ -24,10 +24,12 @@
 #include "Common/CCDB/ctpRateFetcher.h"
 #include "Common/Core/PID/TPCPIDResponse.h"
 #include "Common/Core/TableHelper.h"
+#include "Common/Core/CollisionTypeHelper.h"
 #include "Common/DataModel/PIDResponseTPC.h"
 #include "Common/TableProducer/PID/pidTPCBase.h"
 #include "Tools/ML/model.h"
 
+#include <DataFormatsParameters/GRPLHCIFData.h>
 #include <Framework/AnalysisDataModel.h>
 #include <Framework/AnalysisHelpers.h>
 #include <Framework/Configurable.h>
@@ -47,6 +49,8 @@
 #include <ratio>
 #include <string>
 #include <vector>
+std::string irSource = "-1";
+int collsys = -1;
 
 namespace o2::aod
 {
@@ -127,8 +131,8 @@ struct pidTPCConfigurables : o2::framework::ConfigurableGroup {
   o2::framework::Configurable<int> useNetworkHe{"useNetworkHe", 1, {"Switch for applying neural network on the helium3 mass hypothesis (if network enabled) (set to 0 to disable)"}};
   o2::framework::Configurable<int> useNetworkAl{"useNetworkAl", 1, {"Switch for applying neural network on the alpha mass hypothesis (if network enabled) (set to 0 to disable)"}};
   o2::framework::Configurable<float> networkBetaGammaCutoff{"networkBetaGammaCutoff", 0.45, {"Lower value of beta-gamma to override the NN application"}};
-  o2::framework::Configurable<std::string> irSource{"irSource", "ZNC hadronic", "Estimator of the interaction rate (Recommended: pp --> T0VTX, Pb-Pb --> ZNC hadronic)"};
-};
+  o2::framework::Configurable<std::string> cfgPathGrpLhcIf{"ccdb-path-grplhcif", "GLO/Config/GRPLHCIF", "Path on the CCDB for the GRPLHCIF object"};
+ };
 
 // helper getter - FIXME should be separate
 int getPIDIndex(const int pdgCode) // Get O2 PID index corresponding to MC PDG code
@@ -323,6 +327,14 @@ class pidTPCModule
         }
         LOG(info) << "Successfully retrieved TPC PID object from CCDB for timestamp " << time << ", period " << headers["LPMProductionTag"] << ", recoPass " << headers["RecoPassName"];
         metadata["RecoPassName"] = headers["RecoPassName"]; // Force pass number for NN request to match retrieved BB
+        o2::parameters::GRPLHCIFData* grpo = ccdb->template getForTimeStamp<o2::parameters::GRPLHCIFData>(pidTPCopts.cfgPathGrpLhcIf.value, time);
+        LOG(info) << " collision type::" << CollisionSystemType::getCollisionTypeFromGrp(grpo);
+        collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
+        if ( collsys == CollisionSystemType::kCollSyspp ) {
+          irSource = "T0VTX";
+        } else {
+          irSource = "ZNC hadronic";
+        }
         response->PrintAll();
       }
     }
@@ -397,6 +409,14 @@ class pidTPCModule
         }
         LOG(info) << "Successfully retrieved TPC PID object from CCDB for timestamp " << bc.timestamp() << ", period " << headers["LPMProductionTag"] << ", recoPass " << headers["RecoPassName"];
         metadata["RecoPassName"] = headers["RecoPassName"]; // Force pass number for NN request to match retrieved BB
+        o2::parameters::GRPLHCIFData* grpo = ccdb->template getForTimeStamp<o2::parameters::GRPLHCIFData>(pidTPCopts.cfgPathGrpLhcIf.value, bc.timestamp());
+        LOG(info) << "Collision type::" << CollisionSystemType::getCollisionTypeFromGrp(grpo);
+        int collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
+        if (collsys == CollisionSystemType::kCollSyspp ) {
+          irSource = "T0VTX";
+        } else {
+          irSource = "ZNC hadronic";
+        }
         response->PrintAll();
       }
 
@@ -458,10 +478,14 @@ class pidTPCModule
           if (trk.has_collision()) {
             auto trk_bc = (collisions.iteratorAt(trk.collisionId())).template bc_as<B>();
             if (trk_bc.timestamp() != timeStamp_bcOld) {
-              hadronicRate = mRateFetcher.fetch(ccdb.service, trk_bc.timestamp(), trk_bc.runNumber(), pidTPCopts.irSource.value) * 1.e-3;
+              hadronicRate = mRateFetcher.fetch(ccdb.service, trk_bc.timestamp(), trk_bc.runNumber(), irSource) * 1.e-3;
             }
             timeStamp_bcOld = trk_bc.timestamp();
-            track_properties[counter_track_props + 7] = hadronicRate / 50.;
+            if( collsys == CollisionSystemType::kCollSyspp ) {
+              track_properties[counter_track_props + 7] = hadronicRate / 1500.;
+            }else{
+              track_properties[counter_track_props + 7] = hadronicRate / 50.;
+            }
           } else {
             track_properties[counter_track_props + 7] = 1;
           }
@@ -738,6 +762,14 @@ class pidTPCModule
           }
         }
         LOG(info) << "Successfully retrieved TPC PID object from CCDB for timestamp " << bc.timestamp() << ", period " << headers["LPMProductionTag"] << ", recoPass " << headers["RecoPassName"];
+        o2::parameters::GRPLHCIFData* grpo = ccdb->template getForTimeStamp<o2::parameters::GRPLHCIFData>(pidTPCopts.cfgPathGrpLhcIf.value,bc.timestamp());
+        LOG(info) << "Collisions type::" << CollisionSystemType::getCollisionTypeFromGrp(grpo);
+        int collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
+        if (collsys == CollisionSystemType::kCollSyspp ) {
+          irSource = "T0VTX";
+        } else {
+          irSource = "ZNC hadronic";
+        }
         response->PrintAll();
       }
 
