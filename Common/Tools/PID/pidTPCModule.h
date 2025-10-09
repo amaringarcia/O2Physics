@@ -49,8 +49,6 @@
 #include <ratio>
 #include <string>
 #include <vector>
-std::string irSource = "-1";
-int collsys = -1;
 
 namespace o2::aod
 {
@@ -218,6 +216,10 @@ class pidTPCModule
   std::vector<int> speciesNetworkFlags = std::vector<int>(9);
   std::string networkVersion;
 
+  // To get automatically the proper Hadronic Rate
+  std::string irSource = "";
+  o2::common::core::CollisionSystemType::collType collsys = o2::common::core::CollisionSystemType::kCollSysUndef;
+
   // Parametrization configuration
   bool useCCDBParam = false;
 
@@ -331,9 +333,9 @@ class pidTPCModule
         LOG(info) << " collision type::" << CollisionSystemType::getCollisionTypeFromGrp(grpo);
         collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
         if (collsys == CollisionSystemType::kCollSyspp) {
-          irSource = "T0VTX";
+          irSource = std::string("T0VTX");
         } else {
-          irSource = "ZNC hadronic";
+          irSource = std::string("ZNC hadronic");
         }
         response->PrintAll();
       }
@@ -411,11 +413,11 @@ class pidTPCModule
         metadata["RecoPassName"] = headers["RecoPassName"]; // Force pass number for NN request to match retrieved BB
         o2::parameters::GRPLHCIFData* grpo = ccdb->template getForTimeStamp<o2::parameters::GRPLHCIFData>(pidTPCopts.cfgPathGrpLhcIf.value, bc.timestamp());
         LOG(info) << "Collision type::" << CollisionSystemType::getCollisionTypeFromGrp(grpo);
-        int collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
+        collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
         if (collsys == CollisionSystemType::kCollSyspp) {
-          irSource = "T0VTX";
+          irSource = std::string("T0VTX");
         } else {
-          irSource = "ZNC hadronic";
+          irSource = std::string("ZNC hadronic");
         }
         response->PrintAll();
       }
@@ -450,11 +452,21 @@ class pidTPCModule
     uint64_t counter_track_props = 0;
     int loop_counter = 0;
 
+    // To load the Hadronic rate once for each collision
+    float hadronicRateBegin = 0.;
+    std::vector<float> hadronicRateForCollision(collisions.size(), 0.0f);
+    size_t i = 0;
+    for (const auto& collision : collisions) {
+      const auto& bc = collision.template bc_as<B>();
+      hadronicRateForCollision[i] = mRateFetcher.fetch(ccdb.service, bc.timestamp(), bc.runNumber(), irSource) * 1.e-3;
+      i++;
+    }  
+    auto bc = bcs.begin();
+    hadronicRateBegin = mRateFetcher.fetch(ccdb.service, bc.timestamp(), bc.runNumber(), irSource) * 1.e-3; // kHz
+
     // Filling a std::vector<float> to be evaluated by the network
     // Evaluation on single tracks brings huge overhead: Thus evaluation is done on one large vector
     for (int i = 0; i < 9; i++) { // Loop over particle number for which network correction is used
-      float hadronicRate = 0.;
-      uint64_t timeStamp_bcOld = 0;
       for (auto const& trk : tracks) {
         if (!trk.hasTPC()) {
           continue;
@@ -476,18 +488,19 @@ class pidTPCModule
         if (input_dimensions == 8 && networkVersion == "3") {
           track_properties[counter_track_props + 6] = trk.has_collision() ? collisions.iteratorAt(trk.collisionId()).ft0cOccupancyInTimeRange() / 60000. : 1.;
           if (trk.has_collision()) {
-            auto trk_bc = (collisions.iteratorAt(trk.collisionId())).template bc_as<B>();
-            if (trk_bc.timestamp() != timeStamp_bcOld) {
-              hadronicRate = mRateFetcher.fetch(ccdb.service, trk_bc.timestamp(), trk_bc.runNumber(), irSource) * 1.e-3;
-            }
-            timeStamp_bcOld = trk_bc.timestamp();
             if (collsys == CollisionSystemType::kCollSyspp) {
-              track_properties[counter_track_props + 7] = hadronicRate / 1500.;
+              track_properties[counter_track_props + 7] = hadronicRateForCollision[trk.collisionId()] / 1500.;
             } else {
-              track_properties[counter_track_props + 7] = hadronicRate / 50.;
+              track_properties[counter_track_props + 7] = hadronicRateForCollision[trk.collisionId()] / 50.;
             }
           } else {
-            track_properties[counter_track_props + 7] = 1;
+            // asign Hadronic Rate at beginning of run  if track does not belong to a collision               
+            if (collsys == CollisionSystemType::kCollSyspp) {
+              track_properties[counter_track_props + 7] = hadronicRateBegin / 1500.;
+            } else {
+              track_properties[counter_track_props + 7] = hadronicRateBegin / 50.;
+            }
+  
           }
         }
         counter_track_props += input_dimensions;
@@ -659,6 +672,21 @@ class pidTPCModule
     }
     //_______________________________________
 
+    // Fill Hadronic rate per collision in case CorrectedDEdx is requested
+    std::vector<float> hadronicRateForCollision(cols.size(), 0.0f);
+    float hadronicRateBegin = 0.0f;
+    if (pidTPCopts.useCorrecteddEdx) {
+      size_t i = 0;
+      for (const auto& collision : cols) {
+        const auto& bc = collision.template bc_as<aod::BCsWithTimestamps>();;
+        hadronicRateForCollision[i] = mRateFetcher.fetch(ccdb.service, bc.timestamp(), bc.runNumber(), irSource) * 1.e-3;
+        i++;
+      }  
+      auto bc = bcs.begin();
+      hadronicRateBegin = mRateFetcher.fetch(ccdb.service, bc.timestamp(), bc.runNumber(), irSource) * 1.e-3; // kHz
+    }
+
+
     for (auto const& trk : tracks) {
       // get the TPC signal to be used in the PID
       float tpcSignalToEvaluatePID = trk.tpcSignal();
@@ -687,13 +715,10 @@ class pidTPCModule
         if (trk.has_collision()) {
           auto collision = cols.iteratorAt(trk.collisionId());
           auto bc = collision.template bc_as<aod::BCsWithTimestamps>();
-          const int runnumber = bc.runNumber();
-          hadronicRate = mRateFetcher.fetch(ccdb.service, bc.timestamp(), runnumber, "ZNC hadronic") * 1.e-3; // kHz
+          hadronicRate = hadronicRateForCollision[trk.collisionId()];
           occupancy = collision.trackOccupancyInTimeRange();
         } else {
-          auto bc = bcs.begin();
-          const int runnumber = bc.runNumber();
-          hadronicRate = mRateFetcher.fetch(ccdb.service, bc.timestamp(), runnumber, "ZNC hadronic") * 1.e-3; // kHz
+          hadronicRate = hadronicRateBegin;
           occupancy = 0;
         }
 
@@ -764,11 +789,11 @@ class pidTPCModule
         LOG(info) << "Successfully retrieved TPC PID object from CCDB for timestamp " << bc.timestamp() << ", period " << headers["LPMProductionTag"] << ", recoPass " << headers["RecoPassName"];
         o2::parameters::GRPLHCIFData* grpo = ccdb->template getForTimeStamp<o2::parameters::GRPLHCIFData>(pidTPCopts.cfgPathGrpLhcIf.value, bc.timestamp());
         LOG(info) << "Collisions type::" << CollisionSystemType::getCollisionTypeFromGrp(grpo);
-        int collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
+        collsys = CollisionSystemType::getCollisionTypeFromGrp(grpo);
         if (collsys == CollisionSystemType::kCollSyspp) {
-          irSource = "T0VTX";
+          irSource = std::string("T0VTX");
         } else {
-          irSource = "ZNC hadronic";
+          irSource = std::string("ZNC hadronic");
         }
         response->PrintAll();
       }
